@@ -3,11 +3,14 @@ package actors
 import akka.actor.typed.Behavior
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{ Effect, EventSourcedBehavior }
-import model._
+import model.bankAccount.Command._
+import model.bankAccount.BankAccountEvent._
+import model.bankAccount.Response._
+import model.bankAccount.{ BankAccount, BankAccountEvent, Command }
 
-class PersistentBankAccount {
+object PersistentBankAccount {
 
-  val commandHandler: (BankAccount, Command) => Effect[Event, BankAccount] = (state, command) =>
+  val commandHandler: (BankAccount, Command) => Effect[BankAccountEvent, BankAccount] = (state, command) =>
     command match {
       case CreateBankAccount(user, currency, initialBalance, replyTo) =>
         val id          = state.id
@@ -25,14 +28,14 @@ class PersistentBankAccount {
       case GetBankAccount(id, replyTo) => Effect.reply(replyTo)(GetBankAccountResponse(Some(state)))
     }
 
-  val eventHandler: (BankAccount, Event) => BankAccount = (state, event) =>
+  val eventHandler: (BankAccount, BankAccountEvent) => BankAccount = (state, event) =>
     event match {
       case BankAccountCreated(bankAccount) => bankAccount
       case BalanceUpdated(amount)          => state.copy(balance = state.balance + amount)
     }
 
   def apply(id: String): Behavior[Command] =
-    EventSourcedBehavior[Command, Event, BankAccount](
+    EventSourcedBehavior[Command, BankAccountEvent, BankAccount](
       persistenceId  = PersistenceId.ofUniqueId(id),
       emptyState     = BankAccount(id, "", "", 0.0),
       commandHandler = commandHandler,
