@@ -40,14 +40,24 @@ object Bank {
               Effect.reply(replyTo)(GetBankAccountResponse(None))
           }
       }
-  val eventHandler: (State, BankEvent) => State = ???
+
+  def eventHandler(context: ActorContext[Command]): (State, BankEvent) => State =
+    (state, event) =>
+      event match {
+        case BankAccountCreated(id) =>
+          val bankAccount = context
+            .child(id)
+            .getOrElse(context.spawn(PersistentBankAccount(id), id))
+            .asInstanceOf[ActorRef[Command]]
+          state.copy(state.accounts + (id -> bankAccount))
+      }
 
   def apply(): Behavior[Command] = Behaviors.setup { context =>
     EventSourcedBehavior[Command, BankEvent, State](
       persistenceId  = PersistenceId.ofUniqueId("bank"),
       emptyState     = State(Map()),
       commandHandler = commandHandler(context),
-      eventHandler   = eventHandler
+      eventHandler   = eventHandler(context)
     )
   }
 }
